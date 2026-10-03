@@ -78,6 +78,13 @@ public class CodeMinifierTests
         Assert.Equal("10PRINT\"HI\"", CodeMinifier.RemoveWhitespace("10 PRINT \"HI\""));
     }
 
+    [Fact]
+    public void RemoveWhitespace_PreservesSpaceThatWouldCreateGoKeyword()
+    {
+        string input = "10 IF A=G OR B=G THEN 20";
+        Assert.Equal("10IFA=G ORB=GTHEN20", CodeMinifier.RemoveWhitespace(input));
+    }
+
     // ── Replace0WithPeriod ────────────────────────────────────────────────────
 
     [Fact]

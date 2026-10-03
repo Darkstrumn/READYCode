@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Moonspace Labs, LLC
 // Licensed under the MIT License. See LICENSE in the project root for license information.
 
+using System.Text;
 using System.Text.RegularExpressions;
+using ReadyCode.Tokenizer;
 
 namespace ReadyCode.Minify;
 
@@ -53,7 +55,7 @@ public static class CodeMinifier
             // TrimDataLeadingSpace). The space between the line number and the first token
             // is also removed — C64 BASIC does not require it.
             var (before, dataPart) = SplitAtData(code.Trim());
-            string compact = TransformOutsideStrings(before, s => s.Replace(" ", "")) + TrimDataLeadingSpace(dataPart);
+            string compact = TransformOutsideStrings(before, RemoveAmbiguousWhitespace) + TrimDataLeadingSpace(dataPart);
             result.Add(lineNum + compact);
         }
         return JoinLines(result);
@@ -301,6 +303,52 @@ public static class CodeMinifier
     // Applies transform only to the segments of `code` that lie outside string literals.
     private static string TransformOutsideStrings(string code, Func<string, string> transform) =>
         BasicLineTransformUtil.TransformOutsideStrings(code, transform);
+
+    // C64 BASIC can legally have keywords like GO, FOR, and OR immediately after a single-letter
+    // variable without any separator, so blindly removing every space can accidentally fuse
+    // an expression such as "G OR B" into the invalid token stream "GO RB". Preserve the
+    // space when removing it would make the merged text begin with a recognized keyword.
+    private static string RemoveAmbiguousWhitespace(string code)
+    {
+        var sb = new StringBuilder(code.Length);
+        for (int i = 0; i < code.Length; i++)
+        {
+            if (code[i] != ' ')
+            {
+                sb.Append(code[i]);
+                continue;
+            }
+
+            if (ShouldPreserveSpace(code, i))
+            {
+                sb.Append(' ');
+                continue;
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    private static bool ShouldPreserveSpace(string code, int spaceIndex)
+    {
+        if (spaceIndex <= 0 || spaceIndex + 1 >= code.Length) return false;
+        if (!char.IsLetter(code[spaceIndex - 1]) || !char.IsLetter(code[spaceIndex + 1])) return false;
+
+        int end = spaceIndex + 1;
+        while (end < code.Length && IsWordContinuation(code[end])) end++;
+
+        string combined = code[spaceIndex - 1].ToString() + code[(spaceIndex + 1)..end];
+        foreach (string keyword in BasicTokens.WordKeywordsLongestFirst)
+        {
+            if (combined.Length >= keyword.Length &&
+                combined.AsSpan(0, keyword.Length).Equals(keyword.AsSpan(), StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsWordContinuation(char c) => char.IsLetterOrDigit(c) || c == '$' || c == '%';
 
     private static bool IsRemStatement(string code)
     {
