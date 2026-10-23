@@ -69,6 +69,19 @@ public class CodePrettifierTests
     }
 
     [Fact]
+    public void AddWhitespace_RecognizesGoKeywordShortcutAndPreservesOrOperator()
+    {
+        Assert.Equal("10 IF A = G OR B = G THEN 20", CodePrettifier.AddWhitespace("10IFA=GORB=GTHEN20"));
+        Assert.Equal("10 IF X = GO 20", CodePrettifier.AddWhitespace("10IFX=Go20"));
+    }
+
+    [Fact]
+    public void AddWhitespace_RecognizesPrintQuestionMarkShorthand()
+    {
+        Assert.Equal("10 PRINT \"HI\"", CodePrettifier.AddWhitespace("10?\"HI\""));
+    }
+
+    [Fact]
     public void AddWhitespace_NoSpaceBeforeSemicolon()
     {
         Assert.Equal("10 PRINT;", CodePrettifier.AddWhitespace("10PRINT;"));

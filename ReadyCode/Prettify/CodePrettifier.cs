@@ -249,6 +249,21 @@ public static class CodePrettifier
                 continue;
             }
 
+            // ── PRINT shorthand '?' — treat it as the PRINT keyword ─────────────
+            if (c == '?')
+            {
+                if (!prevIsSpace) sb.Append(' ');
+                sb.Append("PRINT");
+                i++;
+                prevIsSpace = false;
+                lastWasOperand = false;
+
+                char nextCh = i < code.Length ? code[i] : '\0';
+                bool needsSpace = nextCh != '\0' && nextCh != ':' && nextCh != ';' && nextCh != ',' && nextCh != '(' && nextCh != ' ';
+                if (needsSpace) { sb.Append(' '); prevIsSpace = true; }
+                continue;
+            }
+
             // ── Operators: =, +, -, *, /, ^, <, >, <>, <=, >= ─────────────────
             // Always spaced on both sides, except a '-' that negates rather than subtracts,
             // which hugs the value it negates with no space after it.
@@ -285,18 +300,37 @@ public static class CodePrettifier
                 continue;
             }
 
-            // ── Try to match a keyword (longest first) ───────────────────────
-            string? kw = BasicTokens.TryMatchKeyword(code, i, BasicTokens.WordKeywordsLongestFirst, out string matched)
-                ? matched
-                : null;
+            // ── Try to match a keyword or its C64 shift-abbreviation (longest first) ─
+            string? kw = null;
+            int matchedLength = 0;
+            if (BasicKeywordAbbreviations.TryMatchKeywordOrAbbreviation(
+                    code, i, BasicTokens.WordKeywordsLongestFirst, out string matchedKeyword, out int matched)
+                )
+            {
+                kw = matchedKeyword;
+                matchedLength = matched;
+            }
 
             if (kw != null)
             {
+                bool isAmbiguousGo = kw.Equals("GO", StringComparison.OrdinalIgnoreCase)
+                    && i + matchedLength < code.Length
+                    && char.IsLetter(code[i + matchedLength]);
+
+                if (isAmbiguousGo)
+                {
+                    sb.Append(c);
+                    prevIsSpace = false;
+                    lastWasOperand = char.IsLetterOrDigit(c) || c == '$' || c == '%' || c == ')';
+                    i++;
+                    continue;
+                }
+
                 // Space before keyword (unless already at statement start)
                 if (!prevIsSpace) sb.Append(' ');
 
                 sb.Append(kw.ToUpperInvariant());
-                i += kw.Length;
+                i += matchedLength;
                 prevIsSpace = false;
                 lastWasOperand = false; // a keyword precedes an expression, never ends one
 
