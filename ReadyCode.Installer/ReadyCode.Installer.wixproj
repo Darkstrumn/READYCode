@@ -1,5 +1,8 @@
 ﻿<Project Sdk="WixToolset.Sdk/7.0.0">
   <PropertyGroup>
+    <SuppressIces>ICE61</SuppressIces>
+  </PropertyGroup>
+  <PropertyGroup>
     <InstallerVersion>2.5.0.0</InstallerVersion>
     <DefineConstants>InstallerVersion=$(InstallerVersion)</DefineConstants>
   </PropertyGroup>
