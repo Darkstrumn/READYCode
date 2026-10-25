@@ -8,9 +8,9 @@ using System.Text;
 namespace ReadyCode.PocketReady;
 
 /// <summary>
-/// Read-only discovery client for the Pocket READY. target. The caller owns the
+/// Discovery/control/observation client for the Pocket READY. target. The caller owns the
 /// injected HttpClient; no static connection or WPF/dispatcher state is retained.
-/// Upload, execution, memory, assembly and C64 token conversion are not provided.
+/// Control methods are in the companion partial file. Memory, assembly and C64 token conversion are excluded.
 /// </summary>
 public sealed partial class PocketReadyClient
 {
@@ -26,7 +26,7 @@ public sealed partial class PocketReadyClient
         _requestTimeout = requestTimeout ?? TimeSpan.FromSeconds(15);
         if (_requestTimeout <= TimeSpan.Zero || _requestTimeout > TimeSpan.FromMinutes(5))
         {
-            throw new ArgumentOutOfRangeException(nameof(requestTimeout), "Discovery timeout must be positive and at most five minutes.");
+            throw new ArgumentOutOfRangeException(nameof(requestTimeout), "Request timeout must be positive and at most five minutes.");
         }
     }
 
