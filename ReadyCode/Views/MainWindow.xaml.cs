@@ -28,6 +28,7 @@ using ReadyCode.Debugger;
 using ReadyCode.Diagnostics;
 using ReadyCode.Diff;
 using ReadyCode.Editor;
+using ReadyCode.PocketReady;
 using ReadyCode.Formatting;
 using ReadyCode.Interop;
 using ReadyCode.Minify;
@@ -50,7 +51,8 @@ public partial class MainWindow : Window
     // Snapshot of a closed tab's state, kept in _closedTabHistory so Ctrl+Shift+T can restore
     // it exactly - including unsaved content, since the tab may never have matched disk.
     private sealed record ClosedTabSnapshot(
-        string? FilePath, string Text, bool WasModified, int CaretOffset, double ScrollOffsetY);
+        string? FilePath, string Text, bool WasModified, int CaretOffset, double ScrollOffsetY,
+        EditorLanguage Language, string? DisplayName);
 
     #region Private Fields
 
@@ -63,6 +65,8 @@ public partial class MainWindow : Window
     private static readonly Regex _leadingLineNumberPattern = new(@"^(\s*)(\d+)", RegexOptions.Compiled);
 
     private readonly BasicKeywordColorizer _keywordColorizer = new();
+    private readonly PocketReadyKeywordColorizer _pocketKeywordColorizer = new();
+    private PocketReadyWindow? _pocketWindow;
     private readonly LineNumberColorizer _lineNumberColorizer = new();
     private readonly NumberLiteralColorizer _numberLiteralColorizer = new();
     private readonly StringLiteralColorizer _stringLiteralColorizer = new();
@@ -687,6 +691,35 @@ public partial class MainWindow : Window
     private void FileNewBas_Click(object sender, RoutedEventArgs e) =>
         CreateNewTab(EditorLanguage.Basic, C64UFileKind.Bas, "Untitled.bas");
 
+    private void PocketReadyOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pocketWindow is not null) { _pocketWindow.Activate(); return; }
+        var tab = ViewModel.ActiveTab;
+        if (tab?.Language != EditorLanguage.PocketReady || tab.IsHexMode || tab.IsCompareMode || tab.IsDisassemblyMode)
+        {
+            // Work on a new dialect-specific copy; never convert a C64/assembly/disk tab in place.
+            string text = tab is { Language: EditorLanguage.Basic, IsHexMode: false, IsCompareMode: false, IsDisassemblyMode: false }
+                ? tab.Document.Text : string.Empty;
+            CreateNewTab(EditorLanguage.PocketReady, C64UFileKind.Bas, "Untitled.pbas");
+            tab = ViewModel.ActiveTab!;
+            tab.Document.Text = text;
+            tab.IsModified = text.Length != 0;
+        }
+        var window = new PocketReadyWindow(tab) { Owner = this };
+        _pocketWindow = window;
+        NotifyCollectionChangedEventHandler removed = (_, _) =>
+        {
+            if (!ViewModel.OpenTabs.Contains(tab)) window.Close();
+        };
+        ViewModel.OpenTabs.CollectionChanged += removed;
+        window.Closed += (_, _) =>
+        {
+            ViewModel.OpenTabs.CollectionChanged -= removed;
+            _pocketWindow = null;
+        };
+        window.Show();
+    }
+
     private void FileNewAsm_Click(object sender, RoutedEventArgs e) =>
         CreateNewTab(EditorLanguage.Asm, C64UFileKind.Asm, "Untitled.asm");
 
@@ -1115,7 +1148,7 @@ public partial class MainWindow : Window
     {
         var dialog = new OpenFileDialog
         {
-            Filter = "Commodore 64 Programs (*.prg)|*.prg|BASIC Source (*.bas)|*.bas|6502 Assembly (*.asm;*.s)|*.asm;*.s|All Files (*.*)|*.*",
+            Filter = "Commodore 64 Programs (*.prg)|*.prg|BASIC Source (*.bas)|*.bas|Pocket READY. BASIC (*.pbas)|*.pbas|6502 Assembly (*.asm;*.s)|*.asm;*.s|All Files (*.*)|*.*",
             Title = "Open File"
         };
         if (dialog.ShowDialog() == true)
@@ -1744,7 +1777,8 @@ public partial class MainWindow : Window
             ViewModel.CurrentFilePath = dialog.FileName;
             if (ViewModel.ActiveTab != null)
             {
-                ViewModel.ActiveTab.Language = LanguageClassifier.Classify(ViewModel.CurrentFilePath!);
+                if (ViewModel.ActiveTab.Language != EditorLanguage.PocketReady)
+                    ViewModel.ActiveTab.Language = LanguageClassifier.Classify(ViewModel.CurrentFilePath!);
                 ViewModel.ActiveTab.Kind = FileClassifier.Classify(ViewModel.CurrentFilePath!, isFolder: false);
                 ApplyLineTransformersForLanguage(ViewModel.ActiveTab.Language);
 
@@ -1836,6 +1870,8 @@ public partial class MainWindow : Window
     // to whichever one the tab already is instead of always assuming .prg.
     private static (string Filter, string DefaultExt) GetSaveFilterFor(EditorTab? tab)
     {
+        if (tab?.Language == EditorLanguage.PocketReady)
+            return ("Pocket READY. BASIC (*.pbas;*.bas)|*.pbas;*.bas|All Files (*.*)|*.*", ".pbas");
         if (tab?.Language == EditorLanguage.Asm)
             return ("6502 Assembly (*.asm;*.s)|*.asm;*.s|All Files (*.*)|*.*", ".asm");
 
@@ -1861,7 +1897,8 @@ public partial class MainWindow : Window
             };
             if (dialog.ShowDialog() != true) return false;
             tab.FilePath = dialog.FileName;
-            tab.Language = LanguageClassifier.Classify(tab.FilePath);
+            if (tab.Language != EditorLanguage.PocketReady)
+                tab.Language = LanguageClassifier.Classify(tab.FilePath);
             tab.Kind = FileClassifier.Classify(tab.FilePath, isFolder: false);
             if (ReferenceEquals(tab, ViewModel.ActiveTab))
                 ApplyLineTransformersForLanguage(tab.Language);
@@ -1985,7 +2022,7 @@ public partial class MainWindow : Window
     // Gates commands that run BASIC-specific text transforms (prettify/minify/renumber, GOTO
     // navigation, REM comment toggling) and would corrupt or misparse assembly source.
     private bool HasNonEmptyBasicActiveTab() =>
-        HasNonEmptyActiveTab() && ViewModel.ActiveTab?.Language != EditorLanguage.Asm;
+        HasNonEmptyActiveTab() && ViewModel.ActiveTab?.Language == EditorLanguage.Basic;
 
     // Gates Format Code, the assembly counterpart of the BASIC-only commands above.
     private bool HasNonEmptyAsmActiveTab() =>
@@ -2169,7 +2206,15 @@ public partial class MainWindow : Window
         var transformers = Editor.TextArea.TextView.LineTransformers;
         transformers.Clear();
 
-        if (language == EditorLanguage.Asm)
+        if (language == EditorLanguage.PocketReady)
+        {
+            _pocketKeywordColorizer.KeywordBrush = _keywordColorizer.KeywordBrush;
+            transformers.Add(_pocketKeywordColorizer);
+            if (!Editor.TextArea.LeftMargins.Contains(_asmLineNumberMargin))
+                Editor.TextArea.LeftMargins.Insert(0, _asmLineNumberMargin);
+            Editor.TextArea.LeftMargins.Remove(_breakpointMargin);
+        }
+        else if (language == EditorLanguage.Asm)
         {
             transformers.Add(_asmMnemonicColorizer);
             transformers.Add(_asmNumberLiteralColorizer);
@@ -2199,6 +2244,10 @@ public partial class MainWindow : Window
         }
 
         transformers.Add(_findHighlightColorizer);
+        if (language == EditorLanguage.PocketReady)
+            BuildKeywordsList(BasicKeywordsListPanel, PocketReadyLanguage.Completions(string.Empty), new[] { "Pocket READY." });
+        else
+            BuildBasicKeywordsList();
 
         bool isAsm = language == EditorLanguage.Asm;
 
@@ -2206,8 +2255,8 @@ public partial class MainWindow : Window
         // since either can contain real PETSCII control/graphics characters; assembly always
         // uses Consolas with substitution off, since assembly/plain source must never be
         // reinterpreted as PETSCII bytes.
-        Editor.FontFamily = isAsm ? EditorFonts.Consolas : EditorFonts.Petscii;
-        _petsciiGlyphGenerator.IsAsmMode = isAsm;
+        Editor.FontFamily = language == EditorLanguage.Basic ? EditorFonts.Petscii : EditorFonts.Consolas;
+        _petsciiGlyphGenerator.IsAsmMode = language != EditorLanguage.Basic;
         Editor.TextArea.TextView.Redraw();
         VariablesPanel.Visibility = isAsm ? Visibility.Collapsed : Visibility.Visible;
         SymbolsPanel.Visibility = isAsm ? Visibility.Visible : Visibility.Collapsed;
@@ -2336,7 +2385,7 @@ public partial class MainWindow : Window
             tab.Document.Text,
             tab.IsModified,
             isActiveTab ? Editor.CaretOffset : tab.CaretOffset,
-            isActiveTab ? Editor.VerticalOffset : tab.ScrollOffsetY));
+            isActiveTab ? Editor.VerticalOffset : tab.ScrollOffsetY, tab.Language, tab.DisplayName));
         if (_closedTabHistory.Count > _maxClosedTabHistory)
             _closedTabHistory.RemoveAt(0);
 
@@ -2370,10 +2419,11 @@ public partial class MainWindow : Window
         ClosedTabSnapshot snapshot = _closedTabHistory[^1];
         _closedTabHistory.RemoveAt(_closedTabHistory.Count - 1);
 
-        var tab = new EditorTab { FilePath = snapshot.FilePath };
+        var tab = new EditorTab { FilePath = snapshot.FilePath, Language = snapshot.Language, DisplayName = snapshot.DisplayName };
         if (snapshot.FilePath != null)
         {
-            tab.Language = LanguageClassifier.Classify(snapshot.FilePath);
+            if (tab.Language != EditorLanguage.PocketReady)
+                tab.Language = LanguageClassifier.Classify(snapshot.FilePath);
             tab.Kind = FileClassifier.Classify(snapshot.FilePath, isFolder: false);
         }
         tab.Document.Text = snapshot.Text;
@@ -3998,7 +4048,13 @@ public partial class MainWindow : Window
 
         string byteLabel, byteValue, byteDescription;
 
-        if (ViewModel.ActiveTab?.Language == EditorLanguage.Asm)
+        if (ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady)
+        {
+            byteLabel = "UTF-8 source bytes";
+            byteValue = $"{Encoding.UTF8.GetByteCount(text):N0} / {PocketReadyContract.SourceCapacityBytes:N0}";
+            byteDescription = "Pocket READY. source capacity is independent of its virtual memory bus and Android heap.";
+        }
+        else if (ViewModel.ActiveTab?.Language == EditorLanguage.Asm)
         {
             var asmResult = new Asm6502Assembler().Assemble(
                 text, ViewModel.Settings.AsmOutputMode == "Standalone", (ushort)ViewModel.Settings.AsmDefaultOriginAddress);
@@ -5937,14 +5993,18 @@ public partial class MainWindow : Window
     // Returns completion entries matching prefix from whichever provider matches the active
     // tab's language, so ghost text/Ctrl+Space never mixes BASIC keywords and assembly mnemonics.
     private List<KeywordCompletionData> GetCompletionMatches(string prefix) =>
-        ViewModel.ActiveTab?.Language == EditorLanguage.Asm
+        ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady
+            ? PocketReadyLanguage.Completions(prefix)
+            : ViewModel.ActiveTab?.Language == EditorLanguage.Asm
             ? AsmCompletionProvider.GetMatches(prefix)
             : BasicCompletionProvider.GetMatches(prefix);
 
     // Returns every completion entry for the active tab's language, alphabetically - used for
     // the Ctrl+Space "no prefix typed yet" fallback.
     private List<KeywordCompletionData> GetAllCompletionItems() =>
-        ViewModel.ActiveTab?.Language == EditorLanguage.Asm
+        ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady
+            ? PocketReadyLanguage.Completions(string.Empty)
+            : ViewModel.ActiveTab?.Language == EditorLanguage.Asm
             ? [.. AsmCompletionProvider.AllItems.OrderBy(i => i.Text, StringComparer.OrdinalIgnoreCase)]
             : [.. BasicCompletionProvider.AllItems.OrderBy(i => i.Text, StringComparer.OrdinalIgnoreCase)];
 
@@ -7010,7 +7070,8 @@ public partial class MainWindow : Window
     {
         bool isAsm = ViewModel.ActiveTab?.Language == EditorLanguage.Asm;
         _currentDiagnostics = Editor.Document != null && ViewModel.Settings.EnableLinting && !Editor.IsReadOnly
-            ? (isAsm ? AsmDiagnostics.Analyze(Editor.Document.Text, asmResult) : BasicDiagnostics.Analyze(Editor.Document.Text))
+            ? (ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady ? Array.Empty<EditorDiagnostic>()
+                : isAsm ? AsmDiagnostics.Analyze(Editor.Document.Text, asmResult) : BasicDiagnostics.Analyze(Editor.Document.Text))
             : Array.Empty<EditorDiagnostic>();
         _errorSquiggleRenderer.SetDiagnostics(_currentDiagnostics);
         Editor.TextArea.TextView.Redraw();
@@ -7164,7 +7225,8 @@ public partial class MainWindow : Window
     // runs of ";" comments) - null (no active tab) falls back to the BASIC setting, harmless
     // since both call sites already guard on there being a document to fold.
     private bool IsCodeFoldingEnabled(EditorLanguage? language) =>
-        language == EditorLanguage.Asm ? ViewModel.Settings.AsmEnableCodeFolding : ViewModel.Settings.EnableCodeFolding;
+        language != EditorLanguage.PocketReady &&
+        (language == EditorLanguage.Asm ? ViewModel.Settings.AsmEnableCodeFolding : ViewModel.Settings.EnableCodeFolding);
 
     private void ApplyCodeAnalysisSettings()
     {
@@ -8013,6 +8075,7 @@ public partial class MainWindow : Window
 
     private void Editor_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady) return;
         // Ctrl+End: AvalonEdit's own built-in handling already moves the caret to the document
         // end, but the scroll can undershoot on the first press for the same height-tree-staleness
         // reason NavigateToCurrentMatch's own deferred BringCaretToView() call works around - see
@@ -8317,6 +8380,7 @@ public partial class MainWindow : Window
 
     private void Editor_PreviewTextInput(object sender, TextCompositionEventArgs e)
     {
+        if (ViewModel.ActiveTab?.Language == EditorLanguage.PocketReady) return;
         // C64 BASIC is upper case by default - force typed text to match, unless Shift or Caps
         // Lock makes it "shifted" (see ApplyC64Shift). Assembly source case is significant
         // (labels, comments) - leave it to AvalonEdit's normal input handling.
@@ -8414,7 +8478,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (ViewModel.ActiveTab?.Language == EditorLanguage.Asm) return; // preserve pasted case for assembly
+        if (ViewModel.ActiveTab?.Language != EditorLanguage.Basic) return; // preserve native source case outside C64 BASIC
 
         string text = (string)e.DataObject.GetData(DataFormats.Text);
         e.DataObject = new DataObject(text.ToUpperInvariant());

@@ -14,4 +14,7 @@ public enum EditorLanguage
 
     /// <summary>Standard 6502 assembly source.</summary>
     Asm,
+
+    /// <summary>Pocket READY. extended UTF-8 BASIC with optional labels.</summary>
+    PocketReady,
 }

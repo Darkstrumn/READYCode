@@ -1389,7 +1389,8 @@ public class MainViewModel : INotifyPropertyChanged
     }
 
     // Gates Transfer/Run: both need an open tab with at least one character typed into it.
-    private bool HasNonEmptyActiveTab() => !string.IsNullOrEmpty(ActiveTab?.Document.Text);
+    private bool HasNonEmptyActiveTab() => !string.IsNullOrEmpty(ActiveTab?.Document.Text)
+        && ActiveTab.Language != EditorLanguage.PocketReady;
 
     // Gates Print/Print Preview, which only need an open tab regardless of its content.
     private bool HasActiveTab() => ActiveTab != null;
@@ -1604,6 +1605,12 @@ public class MainViewModel : INotifyPropertyChanged
     private bool TryBuildPrgData(string text, out byte[]? prgData, out AssemblyResult? asmResult)
     {
         asmResult = null;
+        if (ActiveTab?.Language == EditorLanguage.PocketReady)
+        {
+            prgData = null;
+            SetStatus("Use the Pocket READY. target for UTF-8 BASIC; this tab cannot become a C64 PRG.", StatusType.Warning);
+            return false;
+        }
 
         if (ActiveTab!.Language == EditorLanguage.Asm)
         {
