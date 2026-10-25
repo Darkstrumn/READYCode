@@ -1,0 +1,46 @@
+{
+  "protocol": {
+    "name": "pocket-ready-console",
+    "major": 1,
+    "minor": 0
+  },
+  "instanceId": "a86f1a90-7592-4eb5-9879-1b2bb2086c9b",
+  "product": {
+    "name": "Pocket READY.",
+    "version": "0.6.43"
+  },
+  "language": {
+    "id": "pocket-ready-basic",
+    "sourceEncoding": "UTF-8",
+    "sourceCapacityBytes": 655360,
+    "lineLabels": "optional"
+  },
+  "device": {
+    "abi": 1,
+    "graphicsPlanes": [
+      "text",
+      "lores",
+      "hires"
+    ],
+    "spriteSlots": 64,
+    "audio": "three-voice-simulation"
+  },
+  "session": {
+    "generation": 0,
+    "phase": "idle",
+    "pending": false
+  },
+  "capabilities": {
+    "transports": [],
+    "controlOperations": [],
+    "sourceFormats": [
+      "basic-utf8"
+    ],
+    "output": false,
+    "locatedDiagnostics": false,
+    "filesystem": false,
+    "virtualMemory": false,
+    "cpuDebug": false,
+    "assembly": false
+  }
+}
