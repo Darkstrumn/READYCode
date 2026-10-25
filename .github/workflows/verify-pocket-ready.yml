@@ -3,7 +3,7 @@ name: Verify READYCode Pocket READY. integration
 on:
   pull_request:
   push:
-    branches: [main, feature/pocket-ready-target]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
