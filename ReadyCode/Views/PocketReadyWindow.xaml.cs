@@ -106,7 +106,9 @@ public partial class PocketReadyWindow : Window
         }
         catch (OperationCanceledException)
         {
-            if (!_closed) StatusText.Text = "Request cancelled. An action may already have applied; query/retry its original ID.";
+            if (!_closed) StatusText.Text = _uncertain
+                ? "Request cancelled. An action may already have applied; query/retry its original ID."
+                : "Request cancelled.";
         }
         catch (Exception error)
         {
@@ -165,6 +167,7 @@ public partial class PocketReadyWindow : Window
     private async Task ExecuteAsync(PocketReadyOperation operation, CancellationToken cancellation)
     {
         PocketReadyReceipt receipt;
+        Append($"[request {operation.Operation} {operation.Id}, instance {operation.InstanceId}, generation {operation.Generation}]\n");
         try
         {
             receipt = await _client.ExecuteAsync(_baseUri!, _token, operation, cancellation);
@@ -195,8 +198,23 @@ public partial class PocketReadyWindow : Window
         if (_discovery?.Capabilities.ControlOperations.Contains(operation) != true)
             throw new InvalidOperationException("The device did not advertise this operation.");
         var request = PocketReadyOperation.Create(_state!, operation, text);
-        _lastOperation = request;
-        await ExecuteAsync(request, cancellation);
+        var unresolved = _uncertain ? _lastOperation : null;
+        if (unresolved is null) _lastOperation = request;
+        try
+        {
+            await ExecuteAsync(request, cancellation);
+        }
+        finally
+        {
+            // STOP may be needed urgently, but must not erase the uncertain action's
+            // original identity. Query/retry still refers to that action afterward.
+            if (unresolved is not null)
+            {
+                _lastOperation = unresolved;
+                _uncertain = true;
+                if (!_closed) StatusText.Text += " Resolve the original uncertain request before new work.";
+            }
+        }
     });
 
     private void Load_Click(object sender, RoutedEventArgs e) => NewOperation("load", SourceEditor.Text);
@@ -291,10 +309,14 @@ public partial class PocketReadyWindow : Window
         var dialog = new SaveFileDialog { Filter = "Pocket READY. BASIC (*.pbas)|*.pbas|BASIC source (*.bas)|*.bas", DefaultExt = ".pbas", FileName = _tab.FileName };
         if (dialog.ShowDialog(this) != true) return;
         string text = SourceEditor.Text;
-        await File.WriteAllTextAsync(dialog.FileName, text, new UTF8Encoding(false), cancellation);
+        await PocketReadySourceFile.SaveAsync(dialog.FileName, text, cancellation);
         _tab.FilePath = dialog.FileName;
         if (_tab.Document.Text == text) _tab.IsModified = false;
-        if (!_closed) StatusText.Text = "UTF-8 source saved. The phone's in-memory program is independent.";
+        if (!_closed)
+        {
+            Title = "Pocket READY. — " + _tab.FileName;
+            StatusText.Text = "UTF-8 source saved. The phone's in-memory program is independent.";
+        }
     });
 
     private void Cancel_Click(object sender, RoutedEventArgs e) => _action?.Cancel();
