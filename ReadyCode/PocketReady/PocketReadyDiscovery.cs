@@ -63,7 +63,7 @@ public sealed record PocketReadyDiscovery
         }
 
         if (Product is null || Product.Name != "Pocket READY." || Product.Version is null ||
-            !Regex.IsMatch(Product.Version, @"^[0-9]+\.[0-9]+\.[0-9]+$", RegexOptions.CultureInvariant))
+            !Regex.IsMatch(Product.Version, @"\A[0-9]+\.[0-9]+\.[0-9]+\z", RegexOptions.CultureInvariant))
         {
             throw new PocketReadyProtocolException("Discovery does not identify a supported Pocket READY. product.");
         }

@@ -73,6 +73,7 @@ public sealed class PocketReadyClientTests
     [Theory]
     [InlineData("protocol", "name", "c64-ultimate")]
     [InlineData("product", "name", "Another calculator")]
+    [InlineData("product", "version", "0.6.43\n")]
     [InlineData("language", "sourceEncoding", "PETSCII")]
     [InlineData("language", "id", "commodore-basic-v2")]
     [InlineData("session", "phase", "not-a-state")]
