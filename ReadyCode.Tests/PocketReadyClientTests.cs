@@ -19,9 +19,9 @@ public sealed class PocketReadyClientTests
     private static string Fixture => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "pocket-ready-discovery.json"));
 
     [Theory]
-    [InlineData("http://192.168.1.20:6401", "http://192.168.1.20:6401/pr/v1/info")]
-    [InlineData("https://example.test/pocket", "https://example.test/pocket/pr/v1/info")]
-    [InlineData("https://example.test/pocket/", "https://example.test/pocket/pr/v1/info")]
+    [InlineData("http://192.168.1.20:6401", "http://192.168.1.20:6401/pocketready/v1/info")]
+    [InlineData("https://example.test/pocket", "https://example.test/pocket/pocketready/v1/info")]
+    [InlineData("https://example.test/pocket/", "https://example.test/pocket/pocketready/v1/info")]
     public async Task GetInfo_UsesPocketReadyRouteAndPreservesProxyBasePath(string baseUrl, string expectedUrl)
     {
         string? requestedUrl = null;

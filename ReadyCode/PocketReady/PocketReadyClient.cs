@@ -12,7 +12,7 @@ namespace ReadyCode.PocketReady;
 /// injected HttpClient; no static connection or WPF/dispatcher state is retained.
 /// Upload, execution, memory, assembly and C64 token conversion are not provided.
 /// </summary>
-public sealed class PocketReadyClient
+public sealed partial class PocketReadyClient
 {
     private const int MaxDiscoveryBytes = 64 * 1024;
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
@@ -31,7 +31,7 @@ public sealed class PocketReadyClient
     }
 
     /// <summary>
-    /// GETs /pr/v1/info, preserving an optional reverse-proxy base path. Cancellation
+    /// GETs /pocketready/v1/info, preserving an optional reverse-proxy base path. Cancellation
     /// covers headers and body; both declared and streamed response sizes are bounded.
     /// A returned descriptor is not a grant of control or evidence of deployment support.
     /// </summary>
@@ -45,7 +45,7 @@ public sealed class PocketReadyClient
         }
 
         var directory = baseUri.AbsoluteUri.EndsWith('/') ? baseUri : new Uri(baseUri.AbsoluteUri + "/");
-        var endpoint = new Uri(directory, "pr/v1/info");
+        var endpoint = new Uri(directory, "pocketready/v1/info");
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_requestTimeout);
         using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
