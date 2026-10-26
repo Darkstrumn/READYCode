@@ -1,0 +1,69 @@
+<Window x:Class="ReadyCode.Views.PocketReadyWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:avalon="http://icsharpcode.net/sharpdevelop/avalonedit"
+        Title="Pocket READY. — BASIC editor and LAN target"
+        Width="1050" Height="820" MinWidth="780" MinHeight="620"
+        WindowStartupLocation="CenterOwner">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="6"/>
+            <RowDefinition Height="190"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="Start LAN console on the phone, allow control, then enter its base URL and temporary token. HTTP is unencrypted; use a trusted LAN."
+                       TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <DockPanel x:Name="ConnectionFields">
+                <TextBlock Text="Base URL " VerticalAlignment="Center"/>
+                <TextBox x:Name="BaseUrl" Text="http://" Width="250" Margin="0,0,12,0"
+                         ToolTip="For example http://192.168.1.20:6401 — without /pocketready/v1/"/>
+                <TextBlock Text="Token " VerticalAlignment="Center"/>
+                <PasswordBox x:Name="AccessToken" MinWidth="230"/>
+            </DockPanel>
+            <WrapPanel Margin="0,8">
+                <Button x:Name="ConnectButton" Content="Discover / Connect" Click="Connect_Click" Padding="10,4" Margin="0,0,8,0"/>
+                <Button Content="Disconnect" Click="Disconnect_Click" Padding="10,4" Margin="0,0,8,0"/>
+                <Button x:Name="CancelButton" Content="Cancel request" Click="Cancel_Click" Padding="10,4" IsEnabled="False" Margin="0,0,8,0"/>
+                <Button Content="Save source…" Click="Save_Click" Padding="10,4"/>
+            </WrapPanel>
+        </StackPanel>
+        <WrapPanel Grid.Row="1" x:Name="ActionPanel" IsEnabled="False" Margin="0,0,0,8">
+            <Button x:Name="LoadButton" Content="Load" Click="Load_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button x:Name="LoadRunButton" Content="Load and run" Click="LoadRun_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button x:Name="RunButton" Content="Run memory" Click="Run_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button Content="Stop" Click="Stop_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button x:Name="RetryButton" Content="Retry exact request" Click="Retry_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button x:Name="QueryButton" Content="Query receipt" Click="Query_Click" Padding="12,4" Margin="0,0,6,0"/>
+            <Button x:Name="ObserveButton" Content="Observe output" Click="Observe_Click" Padding="12,4"/>
+        </WrapPanel>
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="160"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <TextBox x:Name="CommandText" ToolTip="Immediate Pocket READY. BASIC"/>
+            <Button x:Name="CommandButton" Grid.Column="1" Content="Command" Click="Command_Click" Margin="6,0,12,0" Padding="10,4"/>
+            <TextBox x:Name="ProgramInput" Grid.Column="2" ToolTip="Running program input (1–16 UTF-16 code units)"/>
+            <Button x:Name="InputButton" Grid.Column="3" Content="Send input" Click="Input_Click" Margin="6,0,0,0" Padding="10,4"/>
+        </Grid>
+        <avalon:TextEditor x:Name="SourceEditor" Grid.Row="3"
+                           FontFamily="Consolas" FontSize="14" ShowLineNumbers="True"
+                           Background="White" Foreground="Black"
+                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                           TextChanged="SourceEditor_TextChanged"/>
+        <GridSplitter Grid.Row="4" HorizontalAlignment="Stretch" Height="6"/>
+        <TabControl Grid.Row="5">
+            <TabItem Header="Console output (bounded history)">
+                <TextBox x:Name="LogOutput" IsReadOnly="True" FontFamily="Consolas"
+                         AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"/>
+            </TabItem>
+            <TabItem Header="Located errors — double-click to navigate">
+                <ListBox x:Name="DiagnosticsList" MouseDoubleClick="Diagnostic_DoubleClick" DisplayMemberPath="Text"/>
+            </TabItem>
+        </TabControl>
+        <TextBlock x:Name="StatusText" Grid.Row="6" TextWrapping="Wrap" Margin="0,8,0,0"
+                   Text="Source is shared with its READYCode tab; upload never tokenizes, renumbers or minifies it."/>
+    </Grid>
+</Window>

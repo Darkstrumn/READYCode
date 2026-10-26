@@ -20,6 +20,7 @@ public static class LanguageClassifier
         Path.GetExtension(nameOrPath).ToLowerInvariant() switch
         {
             ".asm" or ".s" => EditorLanguage.Asm,
+            ".pbas" => EditorLanguage.PocketReady,
             _ => EditorLanguage.Basic,
         };
 }
