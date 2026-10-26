@@ -2477,6 +2477,11 @@
                         Command="{Binding ViewModel.ViceSystemInfoCommand}"/>
             </MenuItem>
 
+            <MenuItem Header="Pocket READY.">
+                <MenuItem Header="Open BASIC editor and LAN target..."
+                          Click="PocketReadyOpen_Click"/>
+            </MenuItem>
+
             <MenuItem Header="_Preferences">
                 <MenuItem Header="Show Status _Bar"
                           IsCheckable="True"
